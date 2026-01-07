@@ -1,164 +1,145 @@
-# Domain-Constrained Chatbot Using Fine-Tuned GPT-3.5 and R Shiny
+# Vector-Based RAG: Cosine, Dot Product, and Euclidean Distance Explained
 
-This repository contains an end-to-end implementation of a **domain-specific chatbot** built using a **fine-tuned OpenAI GPT-3.5 model**, with all data preparation, inference, and deployment handled in **R**. The chatbot is deployed through a **Shiny web application** and is designed to answer questions strictly within a predefined knowledge scope.
-
----
-
-## Project Summary
-
-The goal of this project is to demonstrate how to:
-
-- Prepare structured training data for OpenAI fine-tuning
-- Fine-tune a chat-based language model for a closed domain
-- Query the fine-tuned model via the OpenAI Chat Completions API
-- Deploy the model in an interactive Shiny chatbot interface
-- Constrain model behavior using system prompts and static context
-
-This project focuses on **controlled question–answering**, not open-ended generation.
+This repository explains **Vector Retrieval-Augmented Generation (RAG)** similarity metrics in a way beginners can understand.  
+We cover **Cosine Similarity, Dot Product, and Euclidean Distance**, step-by-step examples, practical considerations, and modern best practices.
 
 ---
 
-## Key Characteristics
+## 1. What is Parametric vs Non-Parametric Response?
 
-- **Language**: R  
-- **Model**: Fine-tuned `gpt-3.5-turbo`  
-- **Frontend**: Shiny  
-- **Grounding Strategy**:
-  - Fine-tuning on curated Q&A data
-  - Prompt-based context injection (static knowledge)
+- **Parametric response**: The model answers using only its **internal knowledge**.  
+  Example: Standard LLM answering “What is AI?” without searching any external documents.
 
-> ⚠️ This project does **not** implement a true Retrieval-Augmented Generation (RAG) pipeline.  
-> There is no vector database, embedding generation, or dynamic retrieval at inference time.
+- **Non-parametric response**: The model **retrieves external information** before answering.  
+  Example: RAG retrieves the most relevant documents from a database, then generates an answer.
 
-## Repository Structure
-
-├── Training_Data.csv # Question–answer pairs
-├── Training_Data.jsonl # Converted JSONL for fine-tuning
-├── data_preparation.R # CSV → JSONL conversion
-├── inference_test.R # Direct API call to fine-tuned model
-├── shiny_app.R # Shiny chatbot application
-└── README.md
-
+Think of it like:
+- Parametric → your brain only
+- Non-parametric → Google + your brain
 
 ---
 
-## 1. Training Data Preparation
+## 2. How RAG Finds Relevant Documents
 
-Training data is stored as a CSV file containing `question` and `answer` columns.  
-This data is converted into OpenAI’s **JSONL chat format** using R.
+RAG turns documents and queries into **vectors (lists of numbers)** using embeddings.  
+Then it compares vectors to see which document is closest to the query.  
+This is where **similarity metrics** come in.
 
-Each training example follows this structure:
+---
 
-```json
-{
-  "messages": [
-    { "role": "system", "content": "You are a teaching assistant for Machine Learning." },
-    { "role": "user", "content": "<question>" },
-    { "role": "assistant", "content": "<answer>" }
-  ]
-}
-The conversion process ensures compatibility with OpenAI’s fine-tuning API.
+## 3. Cosine Similarity
 
-2. Fine-Tuned Model Inference
+### What it Measures
+- Only the **direction** of vectors.  
+- Ignores magnitude (length of vectors).  
+- Values range from -1 (opposite) to 1 (same direction).
 
-Once fine-tuned, the model is accessed via the OpenAI Chat Completions API.
+### How to Calculate
+1. Take the query and document vectors: `Q` and `D`.  
+2. Compute the dot product: sum of pairwise multiplications.  
+3. Divide by the product of their lengths (norms).
 
-Key configuration choices:
+\[
+\text{Cosine}(Q, D) = \frac{Q \cdot D}{||Q|| \times ||D||}
+\]
 
-Low temperature for deterministic responses
+### Intuition
+- If vectors point in the same direction → very similar.  
+- If vectors point in opposite directions → very different.  
+- Magnitude doesn’t matter: short or long text gives similar score if direction is same.
 
-Controlled token limits
+### Example
+Query: `[1, 0, 1]`  
+Document: `[2, 0, 2]`  
 
-No external knowledge injection beyond training data or prompts
+- Dot product = 1×2 + 0×0 + 1×2 = 4  
+- Norms: ||Q|| = √(1+0+1)=1.414, ||D|| = √(4+0+4)=2.828  
+- Cosine similarity: 4 / (1.414 * 2.828) ≈ 1 → same direction
 
-This ensures consistent, domain-aligned outputs.
+---
 
-3. Prompt-Based Grounding (Static Context)
+## 4. Dot Product
 
-In addition to fine-tuning, the project demonstrates context injection via system prompts.
+### What it Measures
+- Combines **direction + magnitude**.  
+- High dot product = vectors pointing in the same direction **and/or** vectors are long (large values).
 
-A complete story or knowledge base (e.g., a fictional character biography) is passed as a system message at inference time. The model is instructed to answer only using this provided content.
+### Example
+Query: `[1, 0, 1]`  
+Document A: `[1, 0, 1]` → Dot = 2  
+Document B: `[2, 0, 2]` → Dot = 4  
 
-This approach:
+- Same direction, but Document B has higher magnitude → higher score.  
 
-Reduces hallucinations
+### Modern 2026 Best Practice
+> Normalize vectors to **unit length** before storing.  
+> Then dot product = cosine similarity.  
+> This allows **fast dot product computation** while getting the correct directional similarity.
 
-Works well for small, static domains
+### Intuition
+- Dot product without normalization favors long documents.  
+- With normalization, dot product behaves like cosine similarity → better for retrieval.
 
-Does not scale to large or frequently updated knowledge bases
+---
 
-4. Shiny Chatbot Application
+## 5. Euclidean Distance
 
-The Shiny app provides:
+### What it Measures
+- Absolute **distance between vectors**.  
+- Smaller distance → more similar.
 
-A text input for user questions
+### Step-by-Step
+1. Compute element-wise differences: `diff_i = query_i - doc_i`  
+2. Square each difference → penalizes large gaps  
+3. Sum all squared differences  
+4. Take square root → final distance  
+5. The **smallest distance wins** → closest document
 
-Real-time responses from the fine-tuned model
+### Example
+Query: `[1, 0, 1]`  
+Document: `[2, 0, 2]`  
 
-A visible conversation log
+- Differences: `[1, 0, 1]`  
+- Squares: `[1, 0, 1]`  
+- Sum: 2  
+- Square root: √2 ≈ 1.414 → distance
 
-The application communicates directly with the OpenAI API using httr and parses responses using jsonlite.
+### Intuition
+- Measures “how far apart” vectors are.  
+- Sensitive to document length → longer docs may appear further away even if content is relevant.  
+- Pooling method (mean, sum, max) matters.  
+- Chunking (sentence vs paragraph vs document) also affects results.
 
-This setup is suitable for:
+---
 
-Prototyping
+## 6. Quick Comparison Table
 
-Demonstrations
+| Metric            | What it measures       | Sensitive to      | Pros                           | Cons                                         |
+|------------------|----------------------|-----------------|--------------------------------|----------------------------------------------|
+| Cosine Similarity | Direction only        | Vector length    | Robust to long/short documents | Ignores magnitude                            |
+| Dot Product       | Direction + magnitude | Vector length & norms | Can be speed-optimized with normalization | Unnormalized: biases longer documents       |
+| Euclidean Distance| Absolute distance     | Vector values & length | Intuitive, easy to understand  | Sensitive to document length & pooling       |
 
-Internal tools
+---
 
-Educational use cases
+## 7. Key Takeaways for Beginners
 
-What This Project Is
+- Cosine → think “are vectors pointing in same direction?”  
+- Dot → think “same direction **and** length matters”  
+- Euclidean → think “how far apart vectors are in space”  
+- Pre-normalize vectors for speed → dot = cosine  
+- Chunking, pooling, and metric choice all affect retrieval quality
 
-A fine-tuned question–answering system
+---
 
-A demonstration of model grounding via training and prompts
+## References & Further Reading
 
-A practical example of LLM integration in R
+- [RAG: Retrieval-Augmented Generation (Lewis et al., 2020)](https://arxiv.org/abs/2005.11401)  
+- [Dense Passage Retrieval (DPR)](https://arxiv.org/abs/2004.04906)  
+- [FAISS: Efficient Similarity Search](https://github.com/facebookresearch/faiss)  
+- [Understanding Word Embeddings](https://towardsdatascience.com/understanding-word-embeddings-443b7c5b0a7f)
 
-A lightweight chatbot deployment using Shiny
+---
 
-What This Project Is Not
-
-A Retrieval-Augmented Generation (RAG) system
-
-A vector-search-based chatbot
-
-A production-scale knowledge assistant
-
-A dynamic document retrieval system
-
-When to Use This Architecture
-
-This approach is well suited for:
-
-Fictional worlds and narratives
-
-Fixed documentation
-
-Educational assistants
-
-Simulations and experiments
-
-Small, closed knowledge domains
-
-For large or frequently changing datasets, a full RAG pipeline with embeddings and retrieval should be used instead.
-
-Technologies Used
-
-R
-
-Shiny
-
-OpenAI Chat Completions API
-
-Fine-tuned GPT-3.5
-
-jsonlite
-
-httr
-
-## Repository Structure
-
-# Fine-Tuned-Domain-Specific-Chatbot-with-R-and-Shiny
+> This repo is a **conceptual guide** for beginners and intermediate learners.  
+> No code is included—focus is on **understanding the math, intuition, and modern engineering tricks** behind vector similarity in RAG systems.
